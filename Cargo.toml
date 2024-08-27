@@ -1,0 +1,13 @@
+[package]
+name = "yolo-v8"
+version = "0.1.0"
+edition = "2021"
+
+# See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
+
+[dependencies]
+tch = "0.17.0"
+
+[[example]]
+name = "yolo-predict"
+path = "examples/predict/main.rs"
