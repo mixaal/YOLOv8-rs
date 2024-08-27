@@ -7,6 +7,6 @@ fn main() -> Result<(), TchError> {
     let bboxes = yolo.predict(&image, 0.25, 0.35);
     println!("bboxes={:?}", bboxes);
     image.draw_rectangle(&bboxes);
-    image.save("images/result.jpg");
+    image.save("images/result2.jpg");
     Ok(())
 }

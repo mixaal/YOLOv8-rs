@@ -21,4 +21,4 @@ jobs:
     - name: Build examples
       run: ./build.sh
     - name: Check we have result
-      run: ls -l images/result.jpg
+      run: ls -l images/result2.jpg
