@@ -14,9 +14,10 @@ pub struct BBox {
     pub ymax: f64,
     pub conf: f64,
     pub cls: usize,
+    pub name: &'static str,
 }
 
-static CLASSES: [&str; 80] = [
+static CLASSES: [&'static str; 80] = [
     "person",
     "bicycle",
     "car",
@@ -148,13 +149,11 @@ impl YOLOv8 {
         conf_thresh: f64,
         iou_thresh: f64,
     ) -> Vec<BBox> {
-        let (classes_no, anchors) = prediction.size2().unwrap();
-        println!("classes_no={classes_no}, anchors={anchors}");
         let prediction = prediction.transpose(1, 0);
         let (anchors, classes_no) = prediction.size2().unwrap();
 
         let nclasses = (classes_no - 4) as usize;
-        println!("classes_no={classes_no}, anchors={anchors}");
+        // println!("classes_no={classes_no}, anchors={anchors}");
 
         let mut bboxes: Vec<Vec<BBox>> = (0..nclasses).map(|_| vec![]).collect();
 
@@ -167,10 +166,10 @@ impl YOLOv8 {
                 let confidence = pred[i];
                 if confidence > conf_thresh {
                     let class_index = i - 4;
-                    println!(
-                        "confidence={confidence}, class_index={class_index} class_name={}",
-                        CLASSES[class_index]
-                    );
+                    // println!(
+                    //     "confidence={confidence}, class_index={class_index} class_name={}",
+                    //     CLASSES[class_index]
+                    // );
 
                     let bbox = BBox {
                         xmin: pred[0] - pred[2] / 2.,
@@ -179,6 +178,7 @@ impl YOLOv8 {
                         ymax: pred[1] + pred[3] / 2.,
                         conf: confidence,
                         cls: class_index,
+                        name: CLASSES[class_index],
                     };
                     bboxes[class_index].push(bbox)
                 }
