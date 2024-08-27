@@ -17,7 +17,7 @@ jobs:
     steps:
     - uses: actions/checkout@v4
     - name: Download YOLOv8
-      run: cd models; ./yolo.sh
+      run: cd models; sudo apt install -y virtualenv; ./yolo.sh
     - name: Get libtorch
       run: ./build.sh
     - name: Build
