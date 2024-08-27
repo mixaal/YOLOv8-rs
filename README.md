@@ -1,4 +1,5 @@
 # YOLOv8 Image Segmentation
+![build status](https://github.com/mixaal/YOLOv8-rs/actions/workflows/rust.yml/badge.svg)
 
 YOLOv8 object classification. 
 ![result](images/result.jpg)

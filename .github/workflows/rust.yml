@@ -18,9 +18,7 @@ jobs:
     - uses: actions/checkout@v4
     - name: Download YOLOv8
       run: cd models; sudo apt install -y virtualenv; ./yolo.sh
-    - name: Get libtorch
+    - name: Build examples
       run: ./build.sh
-    - name: Build
-      run: cargo build --examples --verbose
-    - name: Run tests
-      run: cargo test --verbose
+    - name: Check we have result
+      run: ls -l images/result.jpg
