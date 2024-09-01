@@ -1,0 +1,7 @@
+export LIBTORCH=$(pwd)/libtorch/
+export LIBTORCH_INCLUDE=$(pwd)/libtorch/
+export LIBTORCH_LIB=$(pwd)/libtorch/
+
+export LD_LIBRARY_PATH="$LIBTORCH/lib/:$LD_LIBRARY_PATH"
+
+code

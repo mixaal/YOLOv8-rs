@@ -1,12 +1,10 @@
 use tch::TchError;
-use yolo_v8::{utils, Image, YoloV8Classifier, YoloV8ObjectDetection, YoloV8Segmentation};
+use yolo_v8::{Image, YoloV8Classifier, YoloV8ObjectDetection, YoloV8Segmentation};
 
 fn object_detection() {
-    utils::preprocess("images/bus.jpg", 640, true);
-
     // Load image to perform object detection, note that YOLOv8 resolution must match
     // scaling width and height here
-    let mut image = Image::new("images/test.jpg", YoloV8ObjectDetection::input_dimension());
+    let mut image = Image::new("images/bus.jpg", YoloV8ObjectDetection::input_dimension());
 
     // Load exported torchscript for object detection
     let yolo = YoloV8ObjectDetection::new();
@@ -44,7 +42,7 @@ fn image_segmentation() {
 // YOLOv8n (nano model) for object detection in image
 fn main() -> Result<(), TchError> {
     object_detection();
-    image_classification();
-    image_segmentation();
+    // image_classification();
+    // image_segmentation();
     Ok(())
 }

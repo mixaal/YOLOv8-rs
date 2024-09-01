@@ -98,7 +98,9 @@ impl YoloV8ObjectDetection {
     }
 
     pub fn predict(&self, image: &Image, conf_thresh: f64, iou_thresh: f64) -> Vec<BBox> {
+        println!("predict(): image={:?}", image.scaled_image);
         let pred = self.yolo.predict(image);
+        println!("pred={:?}", pred);
         self.non_max_suppression(&pred.get(0), conf_thresh, iou_thresh)
     }
 
@@ -251,13 +253,15 @@ impl YOLOv8 {
     pub fn predict(&self, image: &Image) -> Tensor {
         let img = &image.scaled_image;
 
-        // println!("img={:?}", img);
+        println!("img={:?}", img);
 
         let img = img
             .unsqueeze(0)
             .to_kind(tch::Kind::Float)
             .to_device(self.device)
             .g_div_scalar(255.);
+
+        println!("img_float={:?}", img);
 
         let pred = self
             .model
@@ -302,6 +306,13 @@ impl Image {
         let image = tch::vision::image::load(path).expect("can't load image");
         let scaled_image =
             tch::vision::image::resize(&image, width, height).expect("can't resize image");
+        utils::print_tensor(&scaled_image);
+        println!("---------------------------------");
+        // let scaled_image =
+        //     utils::preprocess(path, dimension.0 as i32, true).expect("image preprocess");
+        let scaled_image = utils::plain_resize(path).expect("XXXXXXXXXXXXXXXXXXXXXx");
+        println!("AHOJ");
+        utils::print_tensor(&scaled_image);
         Self {
             width,
             height,
