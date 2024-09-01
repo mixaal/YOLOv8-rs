@@ -1,4 +1,4 @@
-use tch::TchError;
+use tch::{TchError, Tensor};
 use yolo_v8::{Image, YoloV8Classifier, YoloV8ObjectDetection, YoloV8Segmentation};
 
 fn object_detection(path: &str) {
@@ -30,19 +30,36 @@ fn image_classification(path: &str) {
     println!("classes={:?}", classes);
 }
 
-fn image_segmentation() {
-    let image = Image::new("images/test.jpg", YoloV8Segmentation::input_dimension());
+fn image_segmentation(path: &str) {
+    let image = Image::new(path, YoloV8Segmentation::input_dimension());
 
     // Load exported torchscript for object detection
     let yolo = YoloV8Segmentation::new();
 
-    let classes = yolo.predict(&image);
+    let segmentation = yolo.predict(&image, 0.25, 0.7);
+    println!("segmentation={:?}", segmentation);
+    let mut mask_no = 0;
+    for seg in segmentation {
+        let mask = seg.mask.reshape([-1]);
+        let name = seg.segbox.name;
+        let mut rgb = Vec::new();
+        let mut vec = Vec::<f64>::try_from(&mask).unwrap();
+        rgb.append(&mut vec.clone());
+        rgb.append(&mut vec.clone());
+        rgb.append(&mut vec);
+        let im = Tensor::from_slice(&rgb)
+            .reshape([3, 160, 160])
+            .g_mul_scalar(255.);
+        let imgname = format!("mask-{name}-{mask_no}.jpg");
+        tch::vision::image::save(&im, imgname).expect("can't save image");
+        mask_no += 1;
+    }
 }
 
 // YOLOv8n for object detection in image
 fn main() -> Result<(), TchError> {
-    object_detection("images/katri.jpg");
-    // image_classification("images/katri.jpg");
-    // image_segmentation();
+    // object_detection("images/bus.jpg");
+    // image_classification("images/bus.jpg");
+    image_segmentation("images/test.jpg");
     Ok(())
 }

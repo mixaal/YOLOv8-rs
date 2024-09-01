@@ -95,3 +95,18 @@ fn square(size: i32, w: i32, h: i32) -> (i32, i32) {
         (tw, th)
     }
 }
+
+#[cfg(test)]
+mod test {
+    use tch::Tensor;
+
+    #[test]
+    fn matmul() {
+        let a = Tensor::from_slice(&[1, 1]).reshape([1, 2]);
+        let b = Tensor::from_slice(&[1, 2, 3, 4, 5, 6, 7, 8]).reshape([2, 4]);
+        println!("a={}", a);
+        println!("b={}", b);
+        let c = a.matmul(&b);
+        println!("c={}", c);
+    }
+}
