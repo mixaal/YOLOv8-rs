@@ -4,7 +4,12 @@
 // YOLOv8 article:
 //   https://linzichun.com/posts/rust-opencv-onnx-yolov8-detect/
 
-use tch::Tensor;
+pub mod utils;
+
+use classes::DETECT_CLASSES;
+use tch::{IValue, Tensor};
+
+pub(crate) mod classes;
 
 #[derive(Debug, Clone, Copy)]
 pub struct BBox {
@@ -17,119 +22,84 @@ pub struct BBox {
     pub name: &'static str,
 }
 
-static CLASSES: [&'static str; 80] = [
-    "person",
-    "bicycle",
-    "car",
-    "motorcycle",
-    "airplane",
-    "bus",
-    "train",
-    "truck",
-    "boat",
-    "traffic light",
-    "fire hydrant",
-    "stop sign",
-    "parking meter",
-    "bench",
-    "bird",
-    "cat",
-    "dog",
-    "horse",
-    "sheep",
-    "cow",
-    "elephant",
-    "bear",
-    "zebra",
-    "giraffe",
-    "backpack",
-    "umbrella",
-    "handbag",
-    "tie",
-    "suitcase",
-    "frisbee",
-    "skis",
-    "snowboard",
-    "sports ball",
-    "kite",
-    "baseball bat",
-    "baseball glove",
-    "skateboard",
-    "surfboard",
-    "tennis racket",
-    "bottle",
-    "wine glass",
-    "cup",
-    "fork",
-    "knife",
-    "spoon",
-    "bowl",
-    "banana",
-    "apple",
-    "sandwich",
-    "orange",
-    "broccoli",
-    "carrot",
-    "hot dog",
-    "pizza",
-    "donut",
-    "cake",
-    "chair",
-    "couch",
-    "potted plant",
-    "bed",
-    "dining table",
-    "toilet",
-    "tv",
-    "laptop",
-    "mouse",
-    "remote",
-    "keyboard",
-    "cell phone",
-    "microwave",
-    "oven",
-    "toaster",
-    "sink",
-    "refrigerator",
-    "book",
-    "clock",
-    "vase",
-    "scissors",
-    "teddy bear",
-    "hair drier",
-    "toothbrush",
-];
-
-pub struct YOLOv8 {
-    device: tch::Device,
-    model: tch::CModule,
+#[derive(Debug)]
+pub struct ClassConfidence {
+    pub name: &'static str,
+    pub conf: f64,
 }
 
-impl YOLOv8 {
-    pub fn new(path: &str) -> Result<Self, tch::TchError> {
-        let device = tch::Device::cuda_if_available();
-        let model = tch::CModule::load_on_device(path, device)?;
-        Ok(Self { device, model })
+impl ClassConfidence {
+    fn new(idx: usize, conf: f64) -> Self {
+        Self {
+            name: classes::CLASSES[idx],
+            conf,
+        }
+    }
+}
+
+pub struct YoloV8Classifier {
+    yolo: YOLOv8,
+}
+
+impl YoloV8Classifier {
+    pub fn new() -> Self {
+        Self {
+            yolo: YOLOv8::new("models/yolov8x-cls.torchscript").expect("can't load model"),
+        }
+    }
+
+    pub fn predict(&self, image: &Image) -> Vec<ClassConfidence> {
+        let t = self.yolo.predict(image);
+        Self::top_n(t, 5)
+    }
+
+    fn top_n(t: Tensor, n: usize) -> Vec<ClassConfidence> {
+        let v = Vec::<f64>::try_from(t.get(0)).expect("no classification tensor");
+
+        let mut top_val = vec![0.0; n];
+        let mut top_idx = vec![0; n];
+
+        for (idx, conf) in v.iter().enumerate() {
+            for i in 0..n {
+                if (i == 0 && *conf > top_val[0])
+                    || (i > 0 && *conf > top_val[i] && *conf < top_val[i - 1])
+                {
+                    top_val[i] = *conf;
+                    top_idx[i] = idx;
+                }
+            }
+        }
+
+        let mut r = Vec::new();
+        for i in 0..n {
+            r.push(ClassConfidence::new(top_idx[i], top_val[i]));
+        }
+        r
+    }
+
+    pub fn input_dimension() -> (i64, i64) {
+        (224, 224)
+    }
+}
+
+pub struct YoloV8ObjectDetection {
+    yolo: YOLOv8,
+}
+
+impl YoloV8ObjectDetection {
+    pub fn new() -> Self {
+        Self {
+            yolo: YOLOv8::new("models/yolov8n.torchscript").expect("can't load model"),
+        }
+    }
+
+    pub fn input_dimension() -> (i64, i64) {
+        (640, 640)
     }
 
     pub fn predict(&self, image: &Image, conf_thresh: f64, iou_thresh: f64) -> Vec<BBox> {
-        let img = &image.scaled_image;
-
-        let img = img
-            .unsqueeze(0)
-            .to_kind(tch::Kind::Float)
-            .to_device(self.device)
-            .g_div_scalar(255.);
-
-        let pred = self
-            .model
-            .forward_ts(&[img])
-            .unwrap()
-            .to_device(tch::Device::Cpu);
-
-        let result = self.non_max_suppression(&pred.get(0), conf_thresh, iou_thresh);
-
-        result
+        let pred = self.yolo.predict(image);
+        self.non_max_suppression(&pred.get(0), conf_thresh, iou_thresh)
     }
 
     fn iou(&self, b1: &BBox, b2: &BBox) -> f64 {
@@ -178,7 +148,7 @@ impl YOLOv8 {
                         ymax: pred[1] + pred[3] / 2.,
                         conf: confidence,
                         cls: class_index,
-                        name: CLASSES[class_index],
+                        name: DETECT_CLASSES[class_index],
                     };
                     bboxes[class_index].push(bbox)
                 }
@@ -219,6 +189,86 @@ impl YOLOv8 {
     }
 }
 
+pub struct YoloV8Segmentation {
+    yolo: YOLOv8,
+}
+
+impl YoloV8Segmentation {
+    pub fn new() -> Self {
+        Self {
+            yolo: YOLOv8::new("models/yolov8n-seg.torchscript").expect("can't load model"),
+        }
+    }
+
+    pub fn predict(&self, image: &Image) {
+        let img = &image.scaled_image;
+
+        // println!("img={:?}", img);
+
+        let img = img
+            .unsqueeze(0)
+            .to_kind(tch::Kind::Float)
+            .to_device(self.yolo.device)
+            .g_div_scalar(255.);
+
+        let t = tch::IValue::Tensor(img);
+        let pred = self.yolo.model.forward_is(&[t]).unwrap();
+        println!("pred={:?}", pred);
+
+        if let IValue::Tuple(iv) = pred {
+            if let IValue::Tensor(seg) = &iv[1] {
+                let t = seg.get(0);
+                println!("seg={:?}", t);
+                let (nclass, w, h) = t.size3().unwrap();
+                for i in 0..nclass {
+                    let img = t.get(i);
+                    let mut vec: Vec<f32> = vec![0.0; (img.size()[0] * img.size()[1]) as usize];
+                    let l = vec.len();
+                    img.copy_data(&mut vec, l);
+                    println!("i={i}, v={:?}", vec);
+                }
+            }
+        }
+    }
+
+    pub fn input_dimension() -> (i64, i64) {
+        (640, 640)
+    }
+}
+
+pub struct YOLOv8 {
+    device: tch::Device,
+    model: tch::CModule,
+}
+
+impl YOLOv8 {
+    pub fn new(path: &str) -> Result<Self, tch::TchError> {
+        let device = tch::Device::cuda_if_available();
+        let model = tch::CModule::load_on_device(path, device)?;
+        Ok(Self { device, model })
+    }
+
+    pub fn predict(&self, image: &Image) -> Tensor {
+        let img = &image.scaled_image;
+
+        // println!("img={:?}", img);
+
+        let img = img
+            .unsqueeze(0)
+            .to_kind(tch::Kind::Float)
+            .to_device(self.device)
+            .g_div_scalar(255.);
+
+        let pred = self
+            .model
+            .forward_ts(&[img])
+            .unwrap()
+            .to_device(tch::Device::Cpu);
+
+        pred
+    }
+}
+
 pub struct Image {
     width: i64,
     height: i64,
@@ -227,7 +277,28 @@ pub struct Image {
 }
 
 impl Image {
-    pub fn new(path: &str, width: i64, height: i64) -> Self {
+    pub fn from_slice(
+        slice: &[u8],
+        orig_width: i64,
+        orig_height: i64,
+        width: i64,
+        height: i64,
+    ) -> Self {
+        let image = Tensor::from_slice(slice).view((3, orig_height, orig_width));
+        println!("image={:?}", image);
+        let scaled_image =
+            tch::vision::image::resize(&image, width, height).expect("can't resize image");
+        Self {
+            width,
+            height,
+            image,
+            scaled_image,
+        }
+    }
+
+    pub fn new(path: &str, dimension: (i64, i64)) -> Self {
+        let width = dimension.0;
+        let height = dimension.1;
         let image = tch::vision::image::load(path).expect("can't load image");
         let scaled_image =
             tch::vision::image::resize(&image, width, height).expect("can't resize image");

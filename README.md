@@ -13,6 +13,12 @@ The following library is tested against stable version `libtorch-2.4.0`.
 
 ## Quick Start
 
+### Install opencv
+
+```bash
+apt install libopencv-dev clang libclang-dev
+```
+
 ### Obtain YOLOv8
 
 ```bash
