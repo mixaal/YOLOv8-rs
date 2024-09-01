@@ -6,7 +6,7 @@ use opencv::{
 };
 
 // Preprocess input image: resize and pad the image
-pub fn preprocess(image: &str, square_size: i32) -> Result<(), Error> {
+pub fn preprocess(image: &str, square_size: i32, center: bool) -> Result<(), Error> {
     let img = opencv::imgcodecs::imread(image, opencv::imgcodecs::IMREAD_COLOR)?;
     let size = img.size()?;
     let (width, height) = (size.width, size.height);
@@ -14,16 +14,26 @@ pub fn preprocess(image: &str, square_size: i32) -> Result<(), Error> {
     let (uw, uh) = square(square_size, width, height);
     println!("{uw}x{uh}");
     let (mut dw, mut dh) = (square_size - uw, square_size - uh);
-    dw /= 2;
-    dh /= 2;
-    let (top, bottom) = (
-        (dh as f32 - 0.1).round() as i32,
-        (dh as f32 - 0.1).round() as i32,
-    );
-    let (left, right) = (
-        (dw as f32 - 0.1).round() as i32,
-        (dw as f32 - 0.1).round() as i32,
-    );
+    if center {
+        dw /= 2;
+        dh /= 2;
+    }
+    let (top, bottom) = if center {
+        (
+            (dh as f32 - 0.1).round() as i32,
+            (dh as f32 - 0.1).round() as i32,
+        )
+    } else {
+        (0, (dh as f32 + 0.1).round() as i32)
+    };
+    let (left, right) = if center {
+        (
+            (dw as f32 - 0.1).round() as i32,
+            (dw as f32 - 0.1).round() as i32,
+        )
+    } else {
+        (0, (dw as f32 + 0.1).round() as i32)
+    };
     let mut result = Mat::zeros(dh, dw, opencv::core::CV_8UC3)
         .unwrap()
         .to_mat()

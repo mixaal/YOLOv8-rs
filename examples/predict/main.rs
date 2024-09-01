@@ -2,7 +2,7 @@ use tch::TchError;
 use yolo_v8::{utils, Image, YoloV8Classifier, YoloV8ObjectDetection, YoloV8Segmentation};
 
 fn object_detection() {
-    utils::preprocess("images/bus.jpg", 640);
+    utils::preprocess("images/bus.jpg", 640, true);
 
     // Load image to perform object detection, note that YOLOv8 resolution must match
     // scaling width and height here
