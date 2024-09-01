@@ -1,121 +1,86 @@
-use opencv::{
-    core::{copy_make_border, Vector, BORDER_CONSTANT},
-    imgcodecs::imwrite,
-    prelude::*,
-    Error,
-};
 use tch::Tensor;
 
-pub fn plain_resize(image: &str) -> Result<Tensor, Error> {
-    let img = opencv::imgcodecs::imread(image, opencv::imgcodecs::IMREAD_COLOR)?;
-    let mut result = Mat::zeros(640, 640, opencv::core::CV_8UC3)
-        .unwrap()
-        .to_mat()
-        .unwrap();
+pub fn preprocess_torch(path: &str, square_size: i32) -> Tensor {
+    let image = tch::vision::image::load(path).expect("can't load image");
+    let (_, height, width) = image.size3().unwrap();
+    let (uw, uh) = square(square_size, width as i32, height as i32);
+    let scaled_image =
+        tch::vision::image::resize(&image, uw as i64, uh as i64).expect("can't resize image");
+    let scaled_image = Vec::<u8>::try_from(scaled_image.reshape([-1])).expect("vec");
+    let mut gray: Vec<u8> = vec![114; (square_size * square_size * 3) as usize];
+    let dh = (square_size - uh) / 2;
+    let dw = (square_size - uw) / 2;
+    let mut src_y = 0;
+    if uw > uh {
+        for y in dh..dh + uh {
+            let line = get_hline(&scaled_image, (uw as usize, uh as usize), src_y);
+            // println!("line={:?}", line);
+            put_hline(
+                &mut gray,
+                (square_size as usize, square_size as usize),
+                0,
+                y as usize,
+                line,
+            );
+            src_y += 1;
+        }
+    }
+    if uh > uw {
+        for y in 0..square_size {
+            let line = get_hline(&scaled_image, (uw as usize, uh as usize), src_y);
+            // println!("line={:?}", line);
+            put_hline(
+                &mut gray,
+                (square_size as usize, square_size as usize),
+                dw as usize,
+                y as usize,
+                line,
+            );
+            src_y += 1;
+        }
+    }
 
-    opencv::imgproc::resize(
-        &img,
-        &mut result,
-        (640, 640).into(),
-        0.0,
-        0.0,
-        opencv::imgproc::INTER_LINEAR,
-    )?;
-    imwrite("resize.jpg", &result, &Vector::new())?;
-    let t = unsafe {
-        Tensor::from_blob(
-            result.data(),
-            &[640, 640, 3],
-            &[],
-            tch::Kind::Uint8,
-            tch::Device::Cpu,
-        )
-    };
-    let t = t.permute([2, 0, 1]);
-    let t = swap_bgr_to_rgb(t);
-    println!("after: t={:?}", t);
-    tch::vision::image::save(&t, "mezi.jpg").expect("can't save image");
-    Ok(t)
+    let border = Tensor::from_slice(&gray).reshape([3, square_size as i64, square_size as i64]);
+    tch::vision::image::save(&border, "border.jpg").expect("can't save image");
+    border
 }
 
-// Preprocess input image: resize and pad the image
-pub fn preprocess(image: &str, square_size: i32, center: bool) -> Result<Tensor, Error> {
-    let img = opencv::imgcodecs::imread(image, opencv::imgcodecs::IMREAD_COLOR)?;
-    let size = img.size()?;
-    let (width, height) = (size.width, size.height);
-    println!("{width}x{height} -> {square_size}x{square_size}");
-    let (uw, uh) = square(square_size, width, height);
-    println!("{uw}x{uh}");
-    let (mut dw, mut dh) = (square_size - uw, square_size - uh);
-    if center {
-        dw /= 2;
-        dh /= 2;
+fn put_hline(
+    v: &mut Vec<u8>,
+    (w, h): (usize, usize),
+    x_off: usize,
+    y: usize,
+    (r, g, b): (Vec<u8>, Vec<u8>, Vec<u8>),
+) {
+    let r_off = 0;
+    let g_off = w * h;
+    let b_off = 2 * w * h;
+    let mut s_off = y * w;
+    for i in 0..r.len() {
+        // println!("getline: y={y}, i={i}, s_off={s_off} b_off={b_off} idx={idx}");
+        v[r_off + x_off + s_off] = r[i];
+        v[g_off + x_off + s_off] = g[i];
+        v[b_off + x_off + s_off] = b[i];
+        s_off += 1;
     }
-    let (top, bottom) = if center {
-        (
-            (dh as f32 - 0.1).round() as i32,
-            (dh as f32 - 0.1).round() as i32,
-        )
-    } else {
-        (0, (dh as f32 + 0.1).round() as i32)
-    };
-    let (left, right) = if center {
-        (
-            (dw as f32 - 0.1).round() as i32,
-            (dw as f32 - 0.1).round() as i32,
-        )
-    } else {
-        (0, (dw as f32 + 0.1).round() as i32)
-    };
-    let mut result = Mat::zeros(dh, dw, opencv::core::CV_8UC3)
-        .unwrap()
-        .to_mat()
-        .unwrap();
-    opencv::imgproc::resize(
-        &img,
-        &mut result,
-        (uw, uh).into(),
-        0.0,
-        0.0,
-        opencv::imgproc::INTER_LINEAR,
-    )?;
-    let mut border = Mat::zeros(square_size, square_size, opencv::core::CV_8UC3)
-        .unwrap()
-        .to_mat()
-        .unwrap();
-    copy_make_border(
-        &result,
-        &mut border,
-        top,
-        bottom,
-        left,
-        right,
-        BORDER_CONSTANT,
-        (114, 114, 114).into(),
-    )?;
-    imwrite("resize.jpg", &border, &Vector::new())?;
-    println!("{top},{bottom} -> {left},{right}");
+}
 
-    let t = unsafe {
-        Tensor::from_blob(
-            border.data(),
-            &[640, 640, 3],
-            &[],
-            tch::Kind::Uint8,
-            tch::Device::Cpu,
-        )
-    };
-
-    //       im = np.stack(self.pre_transform(im))
-    // im = im[..., ::-1].transpose((0, 3, 1, 2))  # BGR to RGB, BHWC to BCHW, (n, 3, h, w)
-    // im = np.ascontiguousarray(im)  # contiguous
-    // im = torch.from_numpy(im)
-
-    println!("before: t={:?}", t);
-    let t = t.permute([2, 0, 1]);
-    let t = swap_bgr_to_rgb(t);
-    println!("after: t={:?}", t);
-    Ok(t)
+fn get_hline(v: &Vec<u8>, (w, h): (usize, usize), y: usize) -> (Vec<u8>, Vec<u8>, Vec<u8>) {
+    let r_off = 0;
+    let g_off = w * h;
+    let b_off = 2 * w * h;
+    let mut s_off = y * w;
+    let mut r = vec![0; w];
+    let mut g = vec![0; w];
+    let mut b = vec![0; w];
+    for i in 0..w {
+        // println!("getline: y={y}, i={i}, s_off={s_off} b_off={b_off} idx={idx}");
+        r[i] = v[r_off + s_off];
+        g[i] = v[g_off + s_off];
+        b[i] = v[b_off + s_off];
+        s_off += 1;
+    }
+    (r, g, b)
 }
 
 fn square(size: i32, w: i32, h: i32) -> (i32, i32) {
@@ -128,53 +93,5 @@ fn square(size: i32, w: i32, h: i32) -> (i32, i32) {
         let th = size;
         let tw = (size as f32 * aspect) as i32;
         (tw, th)
-    }
-}
-
-fn swap_bgr_to_rgb(img_tensor: Tensor) -> Tensor {
-    // Ensure the input tensor is of the correct shape
-    // Swap channels using indexing
-    // The order [2, 1, 0] corresponds to BGR to RGB
-    let b = img_tensor.narrow_copy(0, 0, 1);
-    img_tensor
-        .narrow(0, 0, 1)
-        .copy_(&img_tensor.narrow(0, 2, 1));
-    img_tensor.narrow(0, 2, 1).copy_(&b);
-    img_tensor
-}
-
-pub fn print_tensor(t: &Tensor) {
-    println!("tensor={}", t);
-}
-
-#[cfg(test)]
-mod test {
-
-    use tch::Tensor;
-
-    use crate::utils::swap_bgr_to_rgb;
-
-    use super::square;
-
-    #[test]
-    fn test_square() {
-        assert_eq!((640, 320), square(640, 1280, 640));
-        assert_eq!((320, 640), square(640, 640, 1280));
-    }
-
-    #[test]
-    fn bgr2rgb() {
-        let t =
-            Tensor::from_slice(&[11, 11, 11, 11, 22, 22, 22, 22, 33, 33, 33, 33]).reshape([3, 4]);
-        println!("t={}", t);
-        let t = swap_bgr_to_rgb(t);
-        // let b = t.narrow(0, 0, 1);
-        // let g = t.narrow(0, 1, 1);
-        // let r = t.narrow(0, 2, 1);
-        // println!("r={}", r);
-        // println!("g={}", g);
-        // println!("b={}", b);
-        // t.narrow_tensor(0, &r, 1);
-        println!("t={}", t);
     }
 }

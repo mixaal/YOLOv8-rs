@@ -98,10 +98,10 @@ impl YoloV8ObjectDetection {
     }
 
     pub fn predict(&self, image: &Image, conf_thresh: f64, iou_thresh: f64) -> Vec<BBox> {
-        println!("predict(): image={:?}", image.scaled_image);
+        // println!("predict(): image={:?}", image.scaled_image);
         let pred = self.yolo.predict(image);
-        println!("pred={:?}", pred);
-        self.non_max_suppression(&pred.get(0), conf_thresh, iou_thresh)
+        // println!("pred={:?}", pred);
+        self.non_max_suppression(image, &pred.get(0), conf_thresh, iou_thresh)
     }
 
     fn iou(&self, b1: &BBox, b2: &BBox) -> f64 {
@@ -117,6 +117,7 @@ impl YoloV8ObjectDetection {
 
     fn non_max_suppression(
         &self,
+        image: &Image,
         prediction: &tch::Tensor,
         conf_thresh: f64,
         iou_thresh: f64,
@@ -143,11 +144,33 @@ impl YoloV8ObjectDetection {
                     //     CLASSES[class_index]
                     // );
 
+                    let (_, orig_h, orig_w) = image.image.size3().unwrap();
+                    let (_, sh, sw) = image.scaled_image.size3().unwrap();
+                    let cx = sw as f64 / 2.0;
+                    let cy = sh as f64 / 2.0;
+                    let mut dx = pred[0] - cx;
+                    let mut dy = pred[1] - cy;
+                    let mut w = pred[2];
+                    let mut h = pred[3];
+
+                    let aspect = orig_w as f64 / orig_h as f64;
+
+                    if orig_w > orig_h {
+                        dy *= aspect;
+                        h *= aspect;
+                    } else {
+                        dx /= aspect;
+                        w /= aspect;
+                    }
+
+                    let x = cx + dx;
+                    let y = cy + dy;
+
                     let bbox = BBox {
-                        xmin: pred[0] - pred[2] / 2.,
-                        ymin: pred[1] - pred[3] / 2.,
-                        xmax: pred[0] + pred[2] / 2.,
-                        ymax: pred[1] + pred[3] / 2.,
+                        xmin: x - w / 2.,
+                        ymin: y - h / 2.,
+                        xmax: x + w / 2.,
+                        ymax: y + h / 2.,
                         conf: confidence,
                         cls: class_index,
                         name: DETECT_CLASSES[class_index],
@@ -253,15 +276,11 @@ impl YOLOv8 {
     pub fn predict(&self, image: &Image) -> Tensor {
         let img = &image.scaled_image;
 
-        println!("img={:?}", img);
-
         let img = img
             .unsqueeze(0)
             .to_kind(tch::Kind::Float)
             .to_device(self.device)
             .g_div_scalar(255.);
-
-        println!("img_float={:?}", img);
 
         let pred = self
             .model
@@ -304,15 +323,9 @@ impl Image {
         let width = dimension.0;
         let height = dimension.1;
         let image = tch::vision::image::load(path).expect("can't load image");
-        let scaled_image =
-            tch::vision::image::resize(&image, width, height).expect("can't resize image");
-        utils::print_tensor(&scaled_image);
-        println!("---------------------------------");
         // let scaled_image =
-        //     utils::preprocess(path, dimension.0 as i32, true).expect("image preprocess");
-        let scaled_image = utils::plain_resize(path).expect("XXXXXXXXXXXXXXXXXXXXXx");
-        println!("AHOJ");
-        utils::print_tensor(&scaled_image);
+        //     tch::vision::image::resize(&image, width, height).expect("can't resize image");
+        let scaled_image = utils::preprocess_torch(path, dimension.0 as i32);
         Self {
             width,
             height,
