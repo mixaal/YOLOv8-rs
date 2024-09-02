@@ -311,7 +311,7 @@ mod test {
 
     fn bbox_eq(a: BBox, b: BBox) {
         assert_eq!(a.cls, b.cls);
-        assert_eq!(a.conf, b.conf);
+        feq(a.conf, b.conf);
         assert_eq!(a.name, b.name);
         feq(a.xmin, b.xmin);
         feq(a.xmax, b.xmax);
