@@ -19,6 +19,9 @@ export LIBTORCH_LIB=$(pwd)/libtorch/
 
 export LD_LIBRARY_PATH="$LIBTORCH/lib/:$LD_LIBRARY_PATH"
 
+cargo test
 cargo build --release --examples
 
 target/release/examples/yolo-predict
+
+
