@@ -1,5 +1,5 @@
 use tch::{TchError, Tensor};
-use yolo_v8::{Image, YoloV8Classifier, YoloV8ObjectDetection, YoloV8Segmentation};
+use yolo_v8::{image::Image, YoloV8Classifier, YoloV8ObjectDetection, YoloV8Segmentation};
 
 fn object_detection(path: &str) {
     // Load image to perform object detection, note that YOLOv8 resolution must match
@@ -10,7 +10,7 @@ fn object_detection(path: &str) {
     let yolo = YoloV8ObjectDetection::new();
 
     // Predict with non-max-suppression in the end
-    let bboxes = yolo.predict(&image, 0.25, 0.7);
+    let bboxes = yolo.predict(&image, 0.25, 0.7).postprocess();
     println!("bboxes={:?}", bboxes);
 
     // Draw rectangles around detected objects
@@ -36,7 +36,7 @@ fn image_segmentation(path: &str) {
     // Load exported torchscript for object detection
     let yolo = YoloV8Segmentation::new();
 
-    let segmentation = yolo.predict(&image, 0.25, 0.7);
+    let segmentation = yolo.predict(&image, 0.25, 0.7).postprocess();
     println!("segmentation={:?}", segmentation);
     let mut mask_no = 0;
     for seg in segmentation {
