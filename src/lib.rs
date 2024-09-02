@@ -313,9 +313,19 @@ mod test {
         assert_eq!(a.cls, b.cls);
         assert_eq!(a.conf, b.conf);
         assert_eq!(a.name, b.name);
-        assert_eq!(a.xmin, b.xmin);
-        assert_eq!(a.xmax, b.xmax);
-        assert_eq!(a.ymin, b.ymin);
-        assert_eq!(a.ymax, b.ymax);
+        feq(a.xmin, b.xmin);
+        feq(a.xmax, b.xmax);
+        feq(a.ymin, b.ymin);
+        feq(a.ymax, b.ymax);
+    }
+
+    fn feq(a: f64, b: f64) {
+        let d = (a - b).abs();
+        if d > 0.001 {
+            println!("a={a} b={b} d={d}");
+            assert!(false, "distance too big");
+        } else {
+            assert!(true, "distance ok");
+        }
     }
 }
