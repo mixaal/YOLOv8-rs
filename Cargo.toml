@@ -11,3 +11,12 @@ tch = "0.17.0"
 [[example]]
 name = "yolo-predict"
 path = "examples/predict/main.rs"
+
+[dev-dependencies]
+criterion = { version = "0.5.1", features = ["html_reports"] }
+
+
+[[bench]]
+name = "preprocess"
+harness = false
+

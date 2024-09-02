@@ -471,9 +471,7 @@ impl Image {
         let width = dimension.0;
         let height = dimension.1;
         let image = tch::vision::image::load(path).expect("can't load image");
-        // let scaled_image =
-        //     tch::vision::image::resize(&image, width, height).expect("can't resize image");
-        let scaled_image = utils::preprocess_torch(path, dimension.0 as i32);
+        let scaled_image = utils::preprocess(&image, dimension.0);
         Self {
             width,
             height,
