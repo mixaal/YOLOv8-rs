@@ -58,8 +58,8 @@ fn image_segmentation(path: &str) {
 
 // YOLOv8n for object detection in image
 fn main() -> Result<(), TchError> {
-    // object_detection("images/bus.jpg");
-    // image_classification("images/bus.jpg");
+    object_detection("images/bus.jpg");
+    image_classification("images/bus.jpg");
     image_segmentation("images/test.jpg");
     Ok(())
 }
