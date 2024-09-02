@@ -250,3 +250,72 @@ impl YOLOv8 {
         pred
     }
 }
+
+#[cfg(test)]
+mod test {
+    use crate::{image::Image, BBox, YoloV8ObjectDetection, YoloV8Segmentation};
+
+    #[test]
+    fn test_segmentation() {
+        let image = Image::new("images/bus.jpg", YoloV8Segmentation::input_dimension());
+        let yolo = YoloV8Segmentation::new();
+        let segmentation = yolo.predict(&image, 0.25, 0.7).postprocess();
+        assert_eq!(3, segmentation.len());
+    }
+
+    #[test]
+    fn test_detection() {
+        let image = Image::new("images/bus.jpg", YoloV8ObjectDetection::input_dimension());
+        let yolo = YoloV8ObjectDetection::new();
+        let detection = yolo.predict(&image, 0.25, 0.7).postprocess();
+        println!("detection={:?}", detection);
+        assert_eq!(3, detection.len());
+        bbox_eq(
+            BBox {
+                xmin: 548.6856384277344,
+                ymin: 311.5385515507371,
+                xmax: 578.6725158691406,
+                ymax: 383.35467598219884,
+                conf: 0.5158080458641052,
+                cls: 0,
+                name: "person",
+            },
+            detection[0],
+        );
+
+        bbox_eq(
+            BBox {
+                xmin: 475.7906494140625,
+                ymin: 282.6662423051286,
+                xmax: 520.7713012695313,
+                ymax: 367.16750926325284,
+                conf: 0.4701675474643707,
+                cls: 0,
+                name: "person",
+            },
+            detection[1],
+        );
+        bbox_eq(
+            BBox {
+                xmin: 13.92529296875,
+                ymin: 111.91644110972788,
+                xmax: 607.813720703125,
+                ymax: 531.2043928770977,
+                conf: 0.9144105911254883,
+                cls: 5,
+                name: "bus",
+            },
+            detection[2],
+        );
+    }
+
+    fn bbox_eq(a: BBox, b: BBox) {
+        assert_eq!(a.cls, b.cls);
+        assert_eq!(a.conf, b.conf);
+        assert_eq!(a.name, b.name);
+        assert_eq!(a.xmin, b.xmin);
+        assert_eq!(a.xmax, b.xmax);
+        assert_eq!(a.ymin, b.ymin);
+        assert_eq!(a.ymax, b.ymax);
+    }
+}
