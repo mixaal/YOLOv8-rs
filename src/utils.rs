@@ -1,6 +1,30 @@
 use tch::{IValue, Tensor};
 
-use crate::{image::ImageCHW, BBox, SegBBox, SegmentationResult};
+use crate::{image::ImageCHW, BBox, SegBBox, SegmentationResult, YOLOModel};
+
+pub(crate) enum YOLOSpec {
+    Classification,
+    ObjectDetection,
+    Segmentation,
+}
+
+pub(crate) fn get_model(model_type: YOLOModel, spec: YOLOSpec) -> String {
+    let specialization = match spec {
+        YOLOSpec::Classification => "-cls",
+        YOLOSpec::ObjectDetection => "",
+        YOLOSpec::Segmentation => "-seg",
+    };
+
+    let model = match model_type {
+        YOLOModel::Nano => "n",
+        YOLOModel::Small => "s",
+        YOLOModel::Medium => "m",
+        YOLOModel::Large => "l",
+        YOLOModel::Extra => "x",
+    };
+
+    format!("models/yolov8{model}{specialization}.torchscript")
+}
 
 pub struct SegmentationTools {}
 pub struct DetectionTools {}
@@ -318,6 +342,8 @@ fn square64(size: i64, w: i64, h: i64) -> (i64, i64) {
 
 #[cfg(test)]
 mod test {
+    use crate::utils::get_model;
+
     use super::preprocess;
 
     #[test]
@@ -344,5 +370,121 @@ mod test {
         assert_eq!(640, h);
         assert_eq!(640, w);
         tch::vision::image::save(&t, "katri_padded.jpg").expect("can't save image");
+    }
+
+    #[test]
+    fn get_model_test() {
+        assert_eq!(
+            "models/yolov8n-cls.torchscript".to_owned(),
+            get_model(
+                crate::YOLOModel::Nano,
+                crate::utils::YOLOSpec::Classification
+            )
+        );
+
+        assert_eq!(
+            "models/yolov8s-cls.torchscript".to_owned(),
+            get_model(
+                crate::YOLOModel::Small,
+                crate::utils::YOLOSpec::Classification
+            )
+        );
+
+        assert_eq!(
+            "models/yolov8m-cls.torchscript".to_owned(),
+            get_model(
+                crate::YOLOModel::Medium,
+                crate::utils::YOLOSpec::Classification
+            )
+        );
+
+        assert_eq!(
+            "models/yolov8l-cls.torchscript".to_owned(),
+            get_model(
+                crate::YOLOModel::Large,
+                crate::utils::YOLOSpec::Classification
+            )
+        );
+
+        assert_eq!(
+            "models/yolov8x-cls.torchscript".to_owned(),
+            get_model(
+                crate::YOLOModel::Extra,
+                crate::utils::YOLOSpec::Classification
+            )
+        );
+
+        assert_eq!(
+            "models/yolov8n-seg.torchscript".to_owned(),
+            get_model(crate::YOLOModel::Nano, crate::utils::YOLOSpec::Segmentation)
+        );
+
+        assert_eq!(
+            "models/yolov8s-seg.torchscript".to_owned(),
+            get_model(
+                crate::YOLOModel::Small,
+                crate::utils::YOLOSpec::Segmentation
+            )
+        );
+
+        assert_eq!(
+            "models/yolov8m-seg.torchscript".to_owned(),
+            get_model(
+                crate::YOLOModel::Medium,
+                crate::utils::YOLOSpec::Segmentation
+            )
+        );
+
+        assert_eq!(
+            "models/yolov8l-seg.torchscript".to_owned(),
+            get_model(
+                crate::YOLOModel::Large,
+                crate::utils::YOLOSpec::Segmentation
+            )
+        );
+
+        assert_eq!(
+            "models/yolov8x-seg.torchscript".to_owned(),
+            get_model(
+                crate::YOLOModel::Extra,
+                crate::utils::YOLOSpec::Segmentation
+            )
+        );
+
+        assert_eq!(
+            "models/yolov8n.torchscript".to_owned(),
+            get_model(
+                crate::YOLOModel::Nano,
+                crate::utils::YOLOSpec::ObjectDetection
+            )
+        );
+        assert_eq!(
+            "models/yolov8s.torchscript".to_owned(),
+            get_model(
+                crate::YOLOModel::Small,
+                crate::utils::YOLOSpec::ObjectDetection
+            )
+        );
+        assert_eq!(
+            "models/yolov8m.torchscript".to_owned(),
+            get_model(
+                crate::YOLOModel::Medium,
+                crate::utils::YOLOSpec::ObjectDetection
+            )
+        );
+        assert_eq!(
+            "models/yolov8l.torchscript".to_owned(),
+            get_model(
+                crate::YOLOModel::Large,
+                crate::utils::YOLOSpec::ObjectDetection
+            )
+        );
+        assert_eq!(
+            "models/yolov8x.torchscript".to_owned(),
+            get_model(
+                crate::YOLOModel::Extra,
+                crate::utils::YOLOSpec::ObjectDetection
+            )
+        );
     }
 }

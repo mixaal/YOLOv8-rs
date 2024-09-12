@@ -9,9 +9,17 @@ pub mod utils;
 
 use image::{Image, ImageCHW};
 use tch::{IValue, Tensor};
-use utils::{DetectionTools, SegmentationTools};
+use utils::{get_model, DetectionTools, SegmentationTools};
 
 pub(crate) mod classes;
+
+pub enum YOLOModel {
+    Nano,
+    Small,
+    Medium,
+    Large,
+    Extra,
+}
 
 #[derive(Debug, Clone, Copy)]
 pub struct BBox {
@@ -104,9 +112,17 @@ pub struct YoloV8Classifier {
 }
 
 impl YoloV8Classifier {
+    pub fn with_model(model_type: YOLOModel) -> Self {
+        Self {
+            yolo: YOLOv8::new(&get_model(model_type, utils::YOLOSpec::Classification))
+                .expect("can't load model"),
+        }
+    }
+
     pub fn new() -> Self {
         Self {
-            yolo: YOLOv8::new("models/yolov8n-cls.torchscript").expect("can't load model"),
+            yolo: YOLOv8::new(&get_model(YOLOModel::Nano, utils::YOLOSpec::Classification))
+                .expect("can't load model"),
         }
     }
 
@@ -149,9 +165,20 @@ pub struct YoloV8ObjectDetection {
 }
 
 impl YoloV8ObjectDetection {
+    pub fn with_model(model_type: YOLOModel) -> Self {
+        Self {
+            yolo: YOLOv8::new(&get_model(model_type, utils::YOLOSpec::ObjectDetection))
+                .expect("can't load model"),
+        }
+    }
+
     pub fn new() -> Self {
         Self {
-            yolo: YOLOv8::new("models/yolov8n.torchscript").expect("can't load model"),
+            yolo: YOLOv8::new(&get_model(
+                YOLOModel::Nano,
+                utils::YOLOSpec::ObjectDetection,
+            ))
+            .expect("can't load model"),
         }
     }
 
@@ -182,9 +209,20 @@ pub struct YoloV8Segmentation {
 }
 
 impl YoloV8Segmentation {
+    pub fn with_model(model_type: YOLOModel) -> Self {
+        Self {
+            yolo: YOLOv8::new(&utils::get_model(model_type, utils::YOLOSpec::Segmentation))
+                .expect("can't load model"),
+        }
+    }
+
     pub fn new() -> Self {
         Self {
-            yolo: YOLOv8::new("models/yolov8n-seg.torchscript").expect("can't load model"),
+            yolo: YOLOv8::new(&utils::get_model(
+                YOLOModel::Nano,
+                utils::YOLOSpec::Segmentation,
+            ))
+            .expect("can't load model"),
         }
     }
 
