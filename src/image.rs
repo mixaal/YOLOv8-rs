@@ -15,7 +15,7 @@ pub struct Image {
 }
 
 impl Image {
-    fn from_tensor(image: Tensor, dimension: (i64, i64)) -> Self {
+    pub fn from_tensor(image: Tensor, dimension: (i64, i64)) -> Self {
         let width = dimension.0;
         let height = dimension.1;
 
