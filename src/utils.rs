@@ -2,7 +2,9 @@ use tch::{IValue, Tensor};
 
 use crate::{image::ImageCHW, BBox, SegBBox, SegmentationResult};
 
-pub struct SegmentationTools {}
+pub struct SegmentationTools {
+    device: tch::Device,
+}
 pub struct DetectionTools {}
 
 impl SegmentationTools {
@@ -12,6 +14,7 @@ impl SegmentationTools {
         scaled_image_dim: ImageCHW,
         conf_threshold: f32,
         iou_threshold: f32,
+        device: tch::Device,
     ) -> Vec<SegmentationResult> {
         let mut result = Vec::new();
 
@@ -33,7 +36,9 @@ impl SegmentationTools {
 
             if let IValue::Tensor(seg) = &iv[1] {
                 for segbox in segboxes {
-                    let weights = Tensor::from_slice(&segbox.cls_weight).reshape([1, 32]);
+                    let weights = Tensor::from_slice(&segbox.cls_weight)
+                        .reshape([1, 32])
+                        .to_device(device);
                     // println!("weights={:?}", weights);
 
                     let t = seg.get(0).reshape([32, 160 * 160]);

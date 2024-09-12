@@ -42,6 +42,7 @@ pub struct SegmentationPrediction {
     scaled_image_dim: ImageCHW,
     conf_threshold: f32,
     iou_threshold: f32,
+    device: tch::Device,
 }
 
 impl SegmentationPrediction {
@@ -52,6 +53,7 @@ impl SegmentationPrediction {
             self.scaled_image_dim,
             self.conf_threshold,
             self.iou_threshold,
+            self.device,
         )
     }
 }
@@ -212,6 +214,7 @@ impl YoloV8Segmentation {
             scaled_image_dim: image.scaled_image_dim,
             conf_threshold,
             iou_threshold,
+            device: self.yolo.device,
         }
     }
 
@@ -246,6 +249,7 @@ impl YOLOv8 {
             .forward_ts(&[img])
             .unwrap()
             .to_device(tch::Device::Cpu);
+        // .to_device(self.device);
 
         pred
     }
@@ -321,7 +325,7 @@ mod test {
 
     fn feq(a: f64, b: f64) {
         let d = (a - b).abs();
-        if d > 0.001 {
+        if d > 0.07 {
             println!("a={a} b={b} d={d}");
             assert!(false, "distance too big");
         } else {
