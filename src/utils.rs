@@ -177,6 +177,11 @@ impl DetectionTools {
         let prediction = prediction.transpose(1, 0);
         let (anchors, classes_no) = prediction.size2().unwrap();
 
+        let initial_w = image_dim.2 as f64;
+        let initial_h = image_dim.1 as f64;
+        let w_ratio = initial_w / scaled_image_dim.2 as f64;
+        let h_ratio = initial_h / scaled_image_dim.1 as f64;
+
         let nclasses = (classes_no - 4) as usize;
         // println!("classes_no={classes_no}, anchors={anchors}");
 
@@ -218,11 +223,16 @@ impl DetectionTools {
                     let x = cx + dx;
                     let y = cy + dy;
 
+                    let xmin = ((x - w / 2.) * w_ratio).clamp(0.0, initial_w - 1.0);
+                    let ymin = ((y - h / 2.) * h_ratio).clamp(0.0, initial_h - 1.0);
+                    let xmax = ((x + w / 2.) * w_ratio).clamp(0.0, initial_w - 1.0);
+                    let ymax = ((y + h / 2.) * h_ratio).clamp(0.0, initial_h - 1.0);
+
                     let bbox = BBox {
-                        xmin: x - w / 2.,
-                        ymin: y - h / 2.,
-                        xmax: x + w / 2.,
-                        ymax: y + h / 2.,
+                        xmin,
+                        ymin,
+                        xmax,
+                        ymax,
                         conf: confidence,
                         cls: class_index,
                         name: crate::classes::DETECT_CLASSES[class_index],

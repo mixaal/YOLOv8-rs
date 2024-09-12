@@ -56,15 +56,12 @@ impl Image {
 
     pub fn draw_rectangle(&mut self, bboxes: &Vec<BBox>) {
         let image = &mut self.image;
-        let (_, initial_h, initial_w) = image.size3().expect("can't get image size");
-        let w_ratio = initial_w as f64 / self.width as f64;
-        let h_ratio = initial_h as f64 / self.height as f64;
 
         for bbox in bboxes.iter() {
-            let xmin = ((bbox.xmin * w_ratio) as i64).clamp(0, initial_w - 1);
-            let ymin = ((bbox.ymin * h_ratio) as i64).clamp(0, initial_h - 1);
-            let xmax = ((bbox.xmax * w_ratio) as i64).clamp(0, initial_w - 1);
-            let ymax = ((bbox.ymax * h_ratio) as i64).clamp(0, initial_h - 1);
+            let xmin = bbox.xmin as i64;
+            let ymin = bbox.ymin as i64;
+            let xmax = bbox.xmax as i64;
+            let ymax = bbox.ymax as i64;
             Self::draw_line(image, xmin, xmax, ymin, ymax.min(ymin + 2));
             Self::draw_line(image, xmin, xmax, ymin.max(ymax - 2), ymax);
             Self::draw_line(image, xmin, xmax.min(xmin + 2), ymin, ymax);
