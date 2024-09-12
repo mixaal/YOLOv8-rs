@@ -2,9 +2,7 @@ use tch::{IValue, Tensor};
 
 use crate::{image::ImageCHW, BBox, SegBBox, SegmentationResult};
 
-pub struct SegmentationTools {
-    device: tch::Device,
-}
+pub struct SegmentationTools {}
 pub struct DetectionTools {}
 
 impl SegmentationTools {
