@@ -1,4 +1,4 @@
-use tch::{IValue, Tensor};
+use tch::{Device, IValue, Kind, Tensor};
 
 use crate::{image::ImageCHW, BBox, SegBBox, SegmentationResult, YOLOModel};
 
@@ -316,7 +316,12 @@ impl DetectionTools {
 pub fn preprocess(image: &Tensor, square_size: i64) -> Tensor {
     let (_, height, width) = image.size3().unwrap();
     let (uw, uh) = square64(square_size, width, height);
-    let scaled_image = tch::vision::image::resize(&image, uw, uh).expect("can't resize image");
+    let scaled_image = if height == uh && width == uw {
+        let out = Tensor::ones(image.size(), (Kind::Int, Device::Cpu));
+        image.clone(&out)
+    } else {
+        tch::vision::image::resize(&image, uw, uh).expect("can't resize image")
+    };
 
     let gray: Vec<u8> = vec![114; (square_size * square_size * 3) as usize];
     let bg = Tensor::from_slice(&gray).reshape([3, square_size, square_size]);
@@ -342,9 +347,28 @@ fn square64(size: i64, w: i64, h: i64) -> (i64, i64) {
 
 #[cfg(test)]
 mod test {
+    use tch::Tensor;
+
     use crate::utils::get_model;
 
     use super::preprocess;
+
+    #[test]
+    fn test_preprocess() {
+        let image = Tensor::from_slice(&[
+            1, 2, 3, 4, 5, 6, 7, 8, 11, 12, 13, 14, 15, 16, 17, 18, 21, 22, 23, 24, 25, 26, 27, 28,
+        ])
+        .reshape([3, 2, 4]);
+        let bg = preprocess(&image, 4);
+        let expect_bg = Tensor::from_slice(&[
+            114, 114, 114, 114, 1, 2, 3, 4, 5, 6, 7, 8, 114, 114, 114, 114, 114, 114, 114, 114, 11,
+            12, 13, 14, 15, 16, 17, 18, 114, 114, 114, 114, 114, 114, 114, 114, 21, 22, 23, 24, 25,
+            26, 27, 28, 114, 114, 114, 114,
+        ])
+        .reshape([3, 4, 4]);
+        println!("bg={}", bg);
+        assert_eq!(expect_bg, bg);
+    }
 
     #[test]
     fn tensor_padding() {
