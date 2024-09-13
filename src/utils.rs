@@ -1,3 +1,5 @@
+use std::time::Instant;
+
 use tch::{Device, IValue, Kind, Tensor};
 
 use crate::{image::ImageCHW, BBox, SegBBox, SegmentationResult, YOLOModel};
@@ -197,6 +199,8 @@ impl DetectionTools {
         conf_thresh: f64,
         iou_thresh: f64,
     ) -> Vec<BBox> {
+        let mut timings = Vec::new();
+        let start = Instant::now();
         let prediction = prediction.get(0);
         let prediction = prediction.transpose(1, 0);
         let (anchors, classes_no) = prediction.size2().unwrap();
@@ -209,62 +213,88 @@ impl DetectionTools {
         let nclasses = (classes_no - 4) as usize;
         // println!("classes_no={classes_no}, anchors={anchors}");
 
+        // println!("pred={:?}", prediction);
+        let sliced_predictions = prediction.slice(1, 4, 84, 1); // 1 for the dimension index
+                                                                // println!("sliced_predictions={:?}", sliced_predictions);
+
+        // Compute the maximum along dimension 1 (across the specified columns)
+        let max_values = sliced_predictions.amax(1, false);
+        // println!("max_values={:?}", max_values);
+        // println!("max_values={}", max_values);
+
+        // Create a boolean mask where max values are greater than the confidence threshold
+        let xc = max_values.gt(conf_thresh);
+        let t = xc.nonzero().view(-1);
+        // println!("t={:?} t={t}", t);
+        let indexes = Vec::<i64>::try_from(t).expect("can't get indexes where confidence is met");
+        // println!("indexes={:?}", indexes);
+        // println!("xc={:?}", xc);
+
         let mut bboxes: Vec<Vec<BBox>> = (0..nclasses).map(|_| vec![]).collect();
 
-        for index in 0..anchors {
+        timings.push(("prolog", start.elapsed()));
+        let start = Instant::now();
+
+        for index in indexes {
+            // println!("has confidence: {index}");
             let pred = Vec::<f64>::try_from(prediction.get(index)).expect("wrong type of tensor");
 
             // println!("index={index}, pred={}", pred.len());
 
+            let mut max_conf = 0.0;
+            let mut idx = 0;
             for i in 4..classes_no as usize {
                 let confidence = pred[i];
-                if confidence > conf_thresh {
-                    let class_index = i - 4;
-                    // println!(
-                    //     "confidence={confidence}, class_index={class_index} class_name={}",
-                    //     CLASSES[class_index]
-                    // );
-
-                    let (_, orig_h, orig_w) = image_dim;
-                    let (_, sh, sw) = scaled_image_dim;
-                    let cx = sw as f64 / 2.0;
-                    let cy = sh as f64 / 2.0;
-                    let mut dx = pred[0] - cx;
-                    let mut dy = pred[1] - cy;
-                    let mut w = pred[2];
-                    let mut h = pred[3];
-
-                    let aspect = orig_w as f64 / orig_h as f64;
-
-                    if orig_w > orig_h {
-                        dy *= aspect;
-                        h *= aspect;
-                    } else {
-                        dx /= aspect;
-                        w /= aspect;
-                    }
-
-                    let x = cx + dx;
-                    let y = cy + dy;
-
-                    let xmin = ((x - w / 2.) * w_ratio).clamp(0.0, initial_w - 1.0);
-                    let ymin = ((y - h / 2.) * h_ratio).clamp(0.0, initial_h - 1.0);
-                    let xmax = ((x + w / 2.) * w_ratio).clamp(0.0, initial_w - 1.0);
-                    let ymax = ((y + h / 2.) * h_ratio).clamp(0.0, initial_h - 1.0);
-
-                    let bbox = BBox {
-                        xmin,
-                        ymin,
-                        xmax,
-                        ymax,
-                        conf: confidence,
-                        cls: class_index,
-                        name: crate::classes::DETECT_CLASSES[class_index],
-                    };
-                    bboxes[class_index].push(bbox)
+                if confidence > max_conf {
+                    max_conf = confidence;
+                    idx = i;
                 }
             }
+
+            if max_conf > conf_thresh && idx >= 4 {
+                let class_index = idx - 4;
+
+                let (_, orig_h, orig_w) = image_dim;
+                let (_, sh, sw) = scaled_image_dim;
+                let cx = sw as f64 / 2.0;
+                let cy = sh as f64 / 2.0;
+                let mut dx = pred[0] - cx;
+                let mut dy = pred[1] - cy;
+                let mut w = pred[2];
+                let mut h = pred[3];
+
+                let aspect = orig_w as f64 / orig_h as f64;
+
+                if orig_w > orig_h {
+                    dy *= aspect;
+                    h *= aspect;
+                } else {
+                    dx /= aspect;
+                    w /= aspect;
+                }
+
+                let x = cx + dx;
+                let y = cy + dy;
+
+                let xmin = ((x - w / 2.) * w_ratio).clamp(0.0, initial_w - 1.0);
+                let ymin = ((y - h / 2.) * h_ratio).clamp(0.0, initial_h - 1.0);
+                let xmax = ((x + w / 2.) * w_ratio).clamp(0.0, initial_w - 1.0);
+                let ymax = ((y + h / 2.) * h_ratio).clamp(0.0, initial_h - 1.0);
+
+                let bbox = BBox {
+                    xmin,
+                    ymin,
+                    xmax,
+                    ymax,
+                    conf: max_conf,
+                    cls: class_index,
+                    name: crate::classes::DETECT_CLASSES[class_index],
+                };
+                bboxes[class_index].push(bbox)
+            }
         }
+        timings.push(("bbox-conf", start.elapsed()));
+        let start = Instant::now();
 
         for bboxes_for_class in bboxes.iter_mut() {
             bboxes_for_class.sort_by(|b1, b2| b2.conf.partial_cmp(&b1.conf).unwrap());
@@ -287,7 +317,9 @@ impl DetectionTools {
             }
             bboxes_for_class.truncate(current_index);
         }
+        timings.push(("iou-processing", start.elapsed()));
 
+        let start = Instant::now();
         let mut result = vec![];
 
         for bboxes_for_class in bboxes.iter() {
@@ -295,6 +327,8 @@ impl DetectionTools {
                 result.push(*bbox);
             }
         }
+        timings.push(("epilog", start.elapsed()));
+        // println!("timings={:?}", timings);
 
         return result;
     }
