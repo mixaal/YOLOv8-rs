@@ -1,4 +1,4 @@
-use std::time::Instant;
+use std::time::{Duration, Instant};
 
 use tch::{Device, IValue, Kind, Tensor};
 
@@ -198,12 +198,17 @@ impl DetectionTools {
         prediction: &tch::Tensor,
         conf_thresh: f64,
         iou_thresh: f64,
-    ) -> Vec<BBox> {
+        run_on_cpu: bool, // in certain cases it's faster to post-process with cpu
+    ) -> (Vec<BBox>, Vec<(&str, Duration)>) {
         let mut timings = Vec::new();
         let start = Instant::now();
         let prediction = prediction.get(0);
-        let prediction = prediction.transpose(1, 0);
-        let (anchors, classes_no) = prediction.size2().unwrap();
+        let prediction = if run_on_cpu {
+            prediction.transpose(1, 0).to_device(tch::Device::Cpu)
+        } else {
+            prediction.transpose(1, 0)
+        };
+        let (_anchors, classes_no) = prediction.size2().unwrap();
 
         let initial_w = image_dim.2 as f64;
         let initial_h = image_dim.1 as f64;
@@ -211,20 +216,26 @@ impl DetectionTools {
         let h_ratio = initial_h / scaled_image_dim.1 as f64;
 
         let nclasses = (classes_no - 4) as usize;
-        // println!("classes_no={classes_no}, anchors={anchors}");
+        let sliced_predictions = prediction.slice(1, 4, 84, 1);
 
-        // println!("pred={:?}", prediction);
-        let sliced_predictions = prediction.slice(1, 4, 84, 1); // 1 for the dimension index
-                                                                // println!("sliced_predictions={:?}", sliced_predictions);
+        timings.push(("prolog", start.elapsed()));
+        let start = Instant::now();
 
         // Compute the maximum along dimension 1 (across the specified columns)
         let max_values = sliced_predictions.amax(1, false);
-        // println!("max_values={:?}", max_values);
-        // println!("max_values={}", max_values);
 
+        timings.push(("max-value", start.elapsed()));
+
+        let start = Instant::now();
         // Create a boolean mask where max values are greater than the confidence threshold
         let xc = max_values.gt(conf_thresh);
+        timings.push(("conf-match", start.elapsed()));
+        let start = Instant::now();
         let t = xc.nonzero().view(-1);
+        // println!("tensor device: non-zero: {:?}", t.device());
+        timings.push(("non-zero", start.elapsed()));
+        let start = Instant::now();
+
         // println!("t={:?} t={t}", t);
         let indexes = Vec::<i64>::try_from(t).expect("can't get indexes where confidence is met");
         // println!("indexes={:?}", indexes);
@@ -232,7 +243,7 @@ impl DetectionTools {
 
         let mut bboxes: Vec<Vec<BBox>> = (0..nclasses).map(|_| vec![]).collect();
 
-        timings.push(("prolog", start.elapsed()));
+        timings.push(("index-to-cpu", start.elapsed()));
         let start = Instant::now();
 
         for index in indexes {
@@ -328,9 +339,7 @@ impl DetectionTools {
             }
         }
         timings.push(("epilog", start.elapsed()));
-        // println!("timings={:?}", timings);
-
-        return result;
+        return (result, timings);
     }
 
     fn iou(b1: &BBox, b2: &BBox) -> f64 {
@@ -344,6 +353,7 @@ impl DetectionTools {
         i_area / (b1_area + b2_area - i_area)
     }
 }
+
 // global image preprocessing:
 //  1) resize, keep aspect ratio
 //  2) padding to square tensor

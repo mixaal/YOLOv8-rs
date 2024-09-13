@@ -18,7 +18,7 @@ fn bench_detection_e2e(c: &mut Criterion) {
             let image = Image::new(black_box("images/bus.jpg"), black_box((640, 640)));
             let yolo = YoloV8ObjectDetection::new();
             let result = yolo.predict(black_box(&image), black_box(0.25), black_box(0.7));
-            black_box(result.postprocess())
+            black_box(result.postprocess().0)
         })
     });
 }

@@ -7,6 +7,8 @@
 pub mod image;
 pub mod utils;
 
+use std::time::Duration;
+
 use image::{Image, ImageCHW};
 use tch::{IValue, Tensor};
 use utils::{get_model, DetectionTools, SegmentationTools};
@@ -72,16 +74,18 @@ pub struct ObjectDetectionPrediction {
     scaled_image_dim: ImageCHW,
     conf_threshold: f64,
     iou_threshold: f64,
+    run_on_cpu: bool,
 }
 
 impl ObjectDetectionPrediction {
-    pub fn postprocess(&self) -> Vec<BBox> {
+    pub fn postprocess(&self) -> (Vec<BBox>, Vec<(&str, Duration)>) {
         DetectionTools::non_max_suppression(
             self.image_dim,
             self.scaled_image_dim,
             &self.pred,
             self.conf_threshold,
             self.iou_threshold,
+            self.run_on_cpu,
         )
     }
 }
@@ -162,6 +166,7 @@ impl YoloV8Classifier {
 
 pub struct YoloV8ObjectDetection {
     yolo: YOLOv8,
+    post_process_on_cpu: bool,
 }
 
 impl YoloV8ObjectDetection {
@@ -169,7 +174,13 @@ impl YoloV8ObjectDetection {
         Self {
             yolo: YOLOv8::new(&get_model(model_type, utils::YOLOSpec::ObjectDetection))
                 .expect("can't load model"),
+            post_process_on_cpu: false,
         }
+    }
+
+    pub fn post_process_on_cpu(mut self) -> Self {
+        self.post_process_on_cpu = true;
+        self
     }
 
     pub fn new() -> Self {
@@ -179,6 +190,7 @@ impl YoloV8ObjectDetection {
                 utils::YOLOSpec::ObjectDetection,
             ))
             .expect("can't load model"),
+            post_process_on_cpu: false,
         }
     }
 
@@ -200,6 +212,7 @@ impl YoloV8ObjectDetection {
             pred,
             conf_threshold,
             iou_threshold,
+            run_on_cpu: self.post_process_on_cpu,
         }
     }
 }
@@ -282,12 +295,10 @@ impl YOLOv8 {
             .to_device(self.device)
             .g_div_scalar(255.);
 
-        let pred = self
-            .model
-            .forward_ts(&[img])
-            .unwrap()
-            .to_device(tch::Device::Cpu);
-        // .to_device(self.device);
+        let pred = self.model.forward_ts(&[img]).unwrap();
+
+        // .to_device(tch::Device::Cpu)
+        // .to_device(self.device)
 
         pred
     }
@@ -309,7 +320,7 @@ mod test {
     fn test_detection() {
         let image = Image::new("images/bus.jpg", YoloV8ObjectDetection::input_dimension());
         let yolo = YoloV8ObjectDetection::new();
-        let detection = yolo.predict(&image, 0.25, 0.7).postprocess();
+        let detection = yolo.predict(&image, 0.25, 0.7).postprocess().0;
         println!("detection={:?}", detection);
         assert_eq!(3, detection.len());
         bbox_eq(

@@ -1,22 +1,43 @@
+use std::time::Instant;
+
 use tch::{TchError, Tensor};
 use yolo_v8::{image::Image, YoloV8Classifier, YoloV8ObjectDetection, YoloV8Segmentation};
 
 fn object_detection(path: &str) {
     // Load image to perform object detection, note that YOLOv8 resolution must match
     // scaling width and height here
+    let mut timings = vec![];
+    let start = Instant::now();
     let mut image = Image::new(path, YoloV8ObjectDetection::input_dimension());
+    timings.push(("load image", start.elapsed()));
 
+    let start = Instant::now();
     // Load exported torchscript for object detection
-    let yolo = YoloV8ObjectDetection::new();
+    let yolo = YoloV8ObjectDetection::new().post_process_on_cpu();
+    timings.push(("load model", start.elapsed()));
 
+    let start = Instant::now();
     // Predict with non-max-suppression in the end
-    let bboxes = yolo.predict(&image, 0.25, 0.7).postprocess();
+    let prediction = yolo.predict(&image, 0.25, 0.7);
+    timings.push(("prediction", start.elapsed()));
+
+    let start = Instant::now();
+    // extract bboxes from prediction in post-processing
+    let bboxes = prediction.postprocess();
+    timings.push(("post-process", start.elapsed()));
     println!("bboxes={:?}", bboxes);
 
+    let start = Instant::now();
     // Draw rectangles around detected objects
-    image.draw_rectangle(&bboxes);
+    image.draw_rectangle(&bboxes.0);
+    timings.push(("draw rectangles", start.elapsed()));
+
+    let start = Instant::now();
     // Finally save the result
     image.save("images/result2.jpg");
+    timings.push(("save result", start.elapsed()));
+
+    println!("timings:{:?}", timings);
 }
 
 fn image_classification(path: &str) {
@@ -58,7 +79,7 @@ fn image_segmentation(path: &str) {
 
 // YOLOv8n for object detection in image
 fn main() -> Result<(), TchError> {
-    object_detection("images/bus.jpg");
+    object_detection("images/frame.png");
     image_classification("images/bus.jpg");
     image_segmentation("images/test.jpg");
     Ok(())
