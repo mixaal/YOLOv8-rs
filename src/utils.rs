@@ -376,7 +376,7 @@ pub fn preprocess(image: &Tensor, square_size: i64) -> Tensor {
     bg
 }
 
-fn square64(size: i64, w: i64, h: i64) -> (i64, i64) {
+pub(crate) fn square64(size: i64, w: i64, h: i64) -> (i64, i64) {
     let aspect = w as f32 / h as f32;
     if w > h {
         let tw = size;

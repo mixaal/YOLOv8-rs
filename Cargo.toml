@@ -5,15 +5,28 @@ edition = "2021"
 
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
+[features]
+default = []
+opencv = ["dep:opencv"]
+
+# use opencv to resize the image during the pre-process step
 [dependencies]
 tch = "0.17.0"
+opencv = { version = "0.92.3", optional = true }
 
 [[example]]
 name = "yolo-predict"
 path = "examples/predict/main.rs"
 
+[[example]]
+name = "video"
+path = "examples/video/main.rs"
+required-features = ["opencv"]
+
+
 [dev-dependencies]
 criterion = { version = "0.5.1", features = ["html_reports"] }
+opencv = "0.92.3"
 
 
 [[bench]]
@@ -31,4 +44,3 @@ harness = false
 [[bench]]
 name = "e2e"
 harness = false
-
