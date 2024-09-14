@@ -26,7 +26,6 @@ required-features = ["opencv"]
 
 [dev-dependencies]
 criterion = { version = "0.5.1", features = ["html_reports"] }
-opencv = "0.92.3"
 
 
 [[bench]]
