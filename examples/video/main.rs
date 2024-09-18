@@ -10,11 +10,23 @@ use opencv::{
 use tch::{Kind, Tensor};
 use yolo_v8::image::Image;
 
+fn get_model(arg_model: String) -> yolo_v8::YOLOModel {
+    match arg_model.to_lowercase().as_str() {
+        "nano" => yolo_v8::YOLOModel::Nano,
+        "small" => yolo_v8::YOLOModel::Small,
+        "medium" => yolo_v8::YOLOModel::Medium,
+        "large" => yolo_v8::YOLOModel::Large,
+        "extra" => yolo_v8::YOLOModel::Extra,
+        _ => panic!("YOLO model can be: nano, small, medium, large or extra"),
+    }
+}
+
 fn main() -> Result<(), opencv::Error> {
     let filename = args().nth(1).unwrap_or("test3.mp4".to_owned());
-    println!("filename={filename}");
+    let model = args().nth(2).unwrap_or("nano".to_owned());
+    println!("filename={filename} model={model}");
     let mut cap = opencv::videoio::VideoCapture::from_file(&filename, CAP_ANY)?;
-    let yolo = yolo_v8::YoloV8ObjectDetection::with_model(yolo_v8::YOLOModel::Nano); //.post_process_on_cpu();
+    let yolo = yolo_v8::YoloV8ObjectDetection::with_model(get_model(model)); //.post_process_on_cpu();
     let device = tch::Device::cuda_if_available();
     println!("device: {:?}", device);
 
