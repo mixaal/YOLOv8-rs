@@ -94,6 +94,23 @@ impl Image {
         })
     }
 
+    #[cfg(feature = "opencv")]
+    pub fn from_slice(
+        slice: &[u8],
+        orig_width: i64,
+        orig_height: i64,
+        dimension: (i64, i64),
+    ) -> Result<Self, opencv::Error> {
+        let cv_mat = opencv::core::Mat::new_rows_cols_with_bytes::<rgb::RGB8>(
+            orig_height as i32,
+            orig_width as i32,
+            slice,
+        )?
+        .clone_pointee();
+        Self::from_opencv_mat(&cv_mat, dimension)
+    }
+
+    #[cfg(not(feature = "opencv"))]
     pub fn from_slice(
         slice: &[u8],
         orig_width: i64,

@@ -6,13 +6,15 @@ edition = "2021"
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
 [features]
+# default = ["opencv"]
 default = []
 opencv = ["dep:opencv"]
 
 # use opencv to resize the image during the pre-process step
 [dependencies]
 tch = "0.17.0"
-opencv = { version = "0.92.3", optional = true }
+opencv = { version = "0.93.0", optional = true, features = ["rgb"] }
+rgb = "0.8.50"
 
 [[example]]
 name = "yolo-predict"
