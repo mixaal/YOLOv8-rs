@@ -1,4 +1,7 @@
-use std::time::{Duration, Instant};
+use std::{
+    env,
+    time::{Duration, Instant},
+};
 
 use tch::{Device, IValue, Kind, Tensor};
 
@@ -25,7 +28,8 @@ pub(crate) fn get_model(model_type: YOLOModel, spec: YOLOSpec) -> String {
         YOLOModel::Extra => "x",
     };
 
-    format!("models/yolov8{model}{specialization}.torchscript")
+    let api_path = env::var("YOLO_V8_MODEL_PATH").unwrap_or("models".to_owned());
+    format!("{api_path}/yolov8{model}{specialization}.torchscript")
 }
 
 pub struct SegmentationTools {}
