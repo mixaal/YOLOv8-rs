@@ -1,19 +1,21 @@
 use std::time::Instant;
 
-use tch::{TchError, Tensor};
-use yolo_v8::{image::Image, YoloV8Classifier, YoloV8ObjectDetection, YoloV8Segmentation};
+use tch::Tensor;
+use yolo_v8::{
+    error::YoloError, image::Image, YoloV8Classifier, YoloV8ObjectDetection, YoloV8Segmentation,
+};
 
-fn object_detection(path: &str) {
+fn object_detection(path: &str) -> Result<(), YoloError> {
     // Load image to perform object detection, note that YOLOv8 resolution must match
     // scaling width and height here
     let mut timings = vec![];
     let start = Instant::now();
-    let mut image = Image::new(path, YoloV8ObjectDetection::input_dimension());
+    let mut image = Image::new(path, YoloV8ObjectDetection::input_dimension())?;
     timings.push(("load image", start.elapsed()));
 
     let start = Instant::now();
     // Load exported torchscript for object detection
-    let yolo = YoloV8ObjectDetection::new().post_process_on_cpu();
+    let yolo = YoloV8ObjectDetection::new()?.post_process_on_cpu();
     timings.push(("load model", start.elapsed()));
 
     let start = Instant::now();
@@ -34,28 +36,30 @@ fn object_detection(path: &str) {
 
     let start = Instant::now();
     // Finally save the result
-    image.save("images/result2.jpg");
+    image.save("images/result2.jpg")?;
     timings.push(("save result", start.elapsed()));
 
     println!("timings:{:?}", timings);
+    Ok(())
 }
 
-fn image_classification(path: &str) {
+fn image_classification(path: &str) -> Result<(), YoloError> {
     // Load image to perform image classification
-    let image = Image::new(path, YoloV8Classifier::input_dimension());
+    let image = Image::new(path, YoloV8Classifier::input_dimension())?;
 
     // Load exported torchscript for object detection
-    let yolo = YoloV8Classifier::new();
+    let yolo = YoloV8Classifier::new()?;
 
-    let classes = yolo.predict(&image);
+    let classes = yolo.predict(&image)?;
     println!("classes={:?}", classes);
+    Ok(())
 }
 
-fn image_segmentation(path: &str) {
-    let image = Image::new(path, YoloV8Segmentation::input_dimension());
+fn image_segmentation(path: &str) -> Result<(), YoloError> {
+    let image = Image::new(path, YoloV8Segmentation::input_dimension())?;
 
     // Load exported torchscript for object detection
-    let yolo = YoloV8Segmentation::new();
+    let yolo = YoloV8Segmentation::new()?;
 
     let segmentation = yolo.predict(&image, 0.25, 0.7).postprocess();
     println!("segmentation={:?}", segmentation);
@@ -75,12 +79,13 @@ fn image_segmentation(path: &str) {
         tch::vision::image::save(&im, imgname).expect("can't save image");
         mask_no += 1;
     }
+    Ok(())
 }
 
 // YOLOv8n for object detection in image
-fn main() -> Result<(), TchError> {
-    object_detection("images/bus.jpg");
-    image_classification("images/bus.jpg");
-    image_segmentation("images/test.jpg");
+fn main() -> Result<(), YoloError> {
+    object_detection("images/bus.jpg")?;
+    image_classification("images/bus.jpg")?;
+    image_segmentation("images/test.jpg")?;
     Ok(())
 }

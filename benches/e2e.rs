@@ -4,8 +4,9 @@ use yolo_v8::{image::Image, YoloV8ObjectDetection, YoloV8Segmentation};
 fn bench_segmentation_e2e(c: &mut Criterion) {
     c.bench_function("bench_segmentation_e2e", |b| {
         b.iter(|| {
-            let image = Image::new(black_box("images/bus.jpg"), black_box((640, 640)));
-            let yolo = YoloV8Segmentation::new();
+            let image = Image::new(black_box("images/bus.jpg"), black_box((640, 640)))
+                .expect("can't load image");
+            let yolo = YoloV8Segmentation::new().expect("can't create yolo model");
             let result = yolo.predict(black_box(&image), black_box(0.25), black_box(0.7));
             black_box(result.postprocess())
         })
@@ -15,8 +16,9 @@ fn bench_segmentation_e2e(c: &mut Criterion) {
 fn bench_detection_e2e(c: &mut Criterion) {
     c.bench_function("bench_detection_e2e", |b| {
         b.iter(|| {
-            let image = Image::new(black_box("images/bus.jpg"), black_box((640, 640)));
-            let yolo = YoloV8ObjectDetection::new();
+            let image = Image::new(black_box("images/bus.jpg"), black_box((640, 640)))
+                .expect("can't load image");
+            let yolo = YoloV8ObjectDetection::new().expect("can't create yolo model");
             let result = yolo.predict(black_box(&image), black_box(0.25), black_box(0.7));
             black_box(result.postprocess().0)
         })

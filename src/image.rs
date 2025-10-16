@@ -1,6 +1,6 @@
 use tch::Tensor;
 
-use crate::{utils, BBox};
+use crate::{error::YoloError, utils, BBox};
 
 // Image channels, height and width
 pub type ImageCHW = (i64, i64, i64);
@@ -121,9 +121,11 @@ impl Image {
         Self::from_tensor(image, dimension)
     }
 
-    pub fn new(path: &str, dimension: (i64, i64)) -> Self {
-        let image = tch::vision::image::load(path).expect("can't load image");
-        Self::from_tensor(image, dimension)
+    pub fn new(path: &str, dimension: (i64, i64)) -> Result<Self, YoloError> {
+        let image = tch::vision::image::load(path).map_err(|e| {
+            YoloError::from_message(format!("can't load image: {path}, error: {e:#?}"))
+        })?;
+        Ok(Self::from_tensor(image, dimension))
     }
 
     fn draw_line(t: &mut tch::Tensor, x1: i64, x2: i64, y1: i64, y2: i64) {
@@ -150,9 +152,12 @@ impl Image {
         }
     }
 
-    pub fn save(&self, path: &str) {
+    pub fn save(&self, path: &str) -> Result<(), YoloError> {
         if let Some(ref image) = self.image {
-            tch::vision::image::save(image, path).expect("can't save image");
+            tch::vision::image::save(image, path).map_err(|e| {
+                YoloError::from_message(format!("can't save image: {path}, error: {e:#?}"))
+            })?;
         }
+        Ok(())
     }
 }

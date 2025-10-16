@@ -4,6 +4,7 @@
 // YOLOv8 article:
 //   https://linzichun.com/posts/rust-opencv-onnx-yolov8-detect/
 
+pub mod error;
 pub mod image;
 pub mod utils;
 
@@ -12,6 +13,8 @@ use std::time::Duration;
 use image::{Image, ImageCHW};
 use tch::{IValue, Tensor};
 use utils::{get_model, DetectionTools, SegmentationTools};
+
+use crate::error::YoloError;
 
 pub(crate) mod classes;
 
@@ -116,27 +119,31 @@ pub struct YoloV8Classifier {
 }
 
 impl YoloV8Classifier {
-    pub fn with_model(model_type: YOLOModel) -> Self {
-        Self {
-            yolo: YOLOv8::new(&get_model(model_type, utils::YOLOSpec::Classification))
-                .expect("can't load model"),
-        }
+    pub fn with_model(model_type: YOLOModel) -> Result<Self, YoloError> {
+        let path = get_model(model_type, utils::YOLOSpec::Classification);
+        let yolo = YOLOv8::new(&path).map_err(|e| {
+            YoloError::from_message(format!("can't load model from {path}, error : {e:#?}"))
+        })?;
+        Ok(Self { yolo })
     }
 
-    pub fn new() -> Self {
-        Self {
-            yolo: YOLOv8::new(&get_model(YOLOModel::Nano, utils::YOLOSpec::Classification))
-                .expect("can't load model"),
-        }
+    pub fn new() -> Result<Self, YoloError> {
+        let path = get_model(YOLOModel::Nano, utils::YOLOSpec::Classification);
+        let yolo = YOLOv8::new(&path).map_err(|e| {
+            YoloError::from_message(format!("can't load model from {path}, error : {e:#?}"))
+        })?;
+        Ok(Self { yolo })
     }
 
-    pub fn predict(&self, image: &Image) -> Vec<ClassConfidence> {
+    pub fn predict(&self, image: &Image) -> Result<Vec<ClassConfidence>, YoloError> {
         let t = self.yolo.predict(image);
         Self::top_n(t, 5)
     }
 
-    fn top_n(t: Tensor, n: usize) -> Vec<ClassConfidence> {
-        let v = Vec::<f64>::try_from(t.get(0)).expect("no classification tensor");
+    fn top_n(t: Tensor, n: usize) -> Result<Vec<ClassConfidence>, YoloError> {
+        let v = Vec::<f64>::try_from(t.get(0)).map_err(|e| {
+            YoloError::from_message(format!("no classification tensor, error: {e:#?}"))
+        })?;
 
         let mut top_val = vec![0.0; n];
         let mut top_idx = vec![0; n];
@@ -156,7 +163,7 @@ impl YoloV8Classifier {
         for i in 0..n {
             r.push(ClassConfidence::new(top_idx[i], top_val[i]));
         }
-        r
+        Ok(r)
     }
 
     pub fn input_dimension() -> (i64, i64) {
@@ -170,12 +177,15 @@ pub struct YoloV8ObjectDetection {
 }
 
 impl YoloV8ObjectDetection {
-    pub fn with_model(model_type: YOLOModel) -> Self {
-        Self {
-            yolo: YOLOv8::new(&get_model(model_type, utils::YOLOSpec::ObjectDetection))
-                .expect("can't load model"),
+    pub fn with_model(model_type: YOLOModel) -> Result<Self, YoloError> {
+        let path = get_model(model_type, utils::YOLOSpec::ObjectDetection);
+        let yolo = YOLOv8::new(&path).map_err(|e| {
+            YoloError::from_message(format!("can't load model from {path}, error : {e:#?}"))
+        })?;
+        Ok(Self {
+            yolo,
             post_process_on_cpu: false,
-        }
+        })
     }
 
     pub fn post_process_on_cpu(mut self) -> Self {
@@ -183,15 +193,15 @@ impl YoloV8ObjectDetection {
         self
     }
 
-    pub fn new() -> Self {
-        Self {
-            yolo: YOLOv8::new(&get_model(
-                YOLOModel::Nano,
-                utils::YOLOSpec::ObjectDetection,
-            ))
-            .expect("can't load model"),
+    pub fn new() -> Result<Self, YoloError> {
+        let path = get_model(YOLOModel::Nano, utils::YOLOSpec::ObjectDetection);
+        let yolo = YOLOv8::new(&path).map_err(|e| {
+            YoloError::from_message(format!("can't load model from {path}, error : {e:#?}"))
+        })?;
+        Ok(Self {
+            yolo,
             post_process_on_cpu: false,
-        }
+        })
     }
 
     pub fn input_dimension() -> (i64, i64) {
@@ -222,21 +232,20 @@ pub struct YoloV8Segmentation {
 }
 
 impl YoloV8Segmentation {
-    pub fn with_model(model_type: YOLOModel) -> Self {
-        Self {
-            yolo: YOLOv8::new(&utils::get_model(model_type, utils::YOLOSpec::Segmentation))
-                .expect("can't load model"),
-        }
+    pub fn with_model(model_type: YOLOModel) -> Result<Self, YoloError> {
+        let path = utils::get_model(model_type, utils::YOLOSpec::Segmentation);
+        let yolo = YOLOv8::new(&path).map_err(|e| {
+            YoloError::from_message(format!("can't load model from {path}, error : {e:#?}"))
+        })?;
+        Ok(Self { yolo })
     }
 
-    pub fn new() -> Self {
-        Self {
-            yolo: YOLOv8::new(&utils::get_model(
-                YOLOModel::Nano,
-                utils::YOLOSpec::Segmentation,
-            ))
-            .expect("can't load model"),
-        }
+    pub fn new() -> Result<Self, YoloError> {
+        let path = utils::get_model(YOLOModel::Nano, utils::YOLOSpec::Segmentation);
+        let yolo = YOLOv8::new(&path).map_err(|e| {
+            YoloError::from_message(format!("can't load model from {path}, error : {e:#?}"))
+        })?;
+        Ok(Self { yolo })
     }
 
     pub fn predict(
@@ -310,16 +319,18 @@ mod test {
 
     #[test]
     fn test_segmentation() {
-        let image = Image::new("images/bus.jpg", YoloV8Segmentation::input_dimension());
-        let yolo = YoloV8Segmentation::new();
+        let image = Image::new("images/bus.jpg", YoloV8Segmentation::input_dimension())
+            .expect("can't load image");
+        let yolo = YoloV8Segmentation::new().expect("can't create yolo model");
         let segmentation = yolo.predict(&image, 0.25, 0.7).postprocess();
         assert_eq!(3, segmentation.len());
     }
 
     #[test]
     fn test_detection() {
-        let image = Image::new("images/bus.jpg", YoloV8ObjectDetection::input_dimension());
-        let yolo = YoloV8ObjectDetection::new();
+        let image = Image::new("images/bus.jpg", YoloV8ObjectDetection::input_dimension())
+            .expect("can't load image");
+        let yolo = YoloV8ObjectDetection::new().expect("can't create yolo model");
         let detection = yolo.predict(&image, 0.25, 0.7).postprocess().0;
         println!("detection={:?}", detection);
         assert_eq!(3, detection.len());
