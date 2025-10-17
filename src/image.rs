@@ -121,6 +121,16 @@ impl Image {
         Self::from_tensor(image, dimension)
     }
 
+    // already read the file into memory
+    pub fn load_from_memory(
+        img_file_data: &[u8],
+        dimension: (i64, i64),
+    ) -> Result<Self, YoloError> {
+        let image = tch::vision::image::load_from_memory(img_file_data)
+            .map_err(|e| YoloError::from_message(format!("can't load image: {e:#?}")))?;
+        Ok(Self::from_tensor(image, dimension))
+    }
+
     pub fn new(path: &str, dimension: (i64, i64)) -> Result<Self, YoloError> {
         let image = tch::vision::image::load(path).map_err(|e| {
             YoloError::from_message(format!("can't load image: {path}, error: {e:#?}"))

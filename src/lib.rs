@@ -315,6 +315,8 @@ impl YOLOv8 {
 
 #[cfg(test)]
 mod test {
+    use std::fs::read;
+
     use crate::{image::Image, BBox, YoloV8ObjectDetection, YoloV8Segmentation};
 
     #[test]
@@ -328,8 +330,10 @@ mod test {
 
     #[test]
     fn test_detection() {
-        let image = Image::new("images/bus.jpg", YoloV8ObjectDetection::input_dimension())
-            .expect("can't load image");
+        let bus_image_data = std::fs::read("images/bus.jpg").expect("can't load image/bus.jpg");
+        let image =
+            Image::load_from_memory(&bus_image_data, YoloV8ObjectDetection::input_dimension())
+                .expect("can't load image");
         let yolo = YoloV8ObjectDetection::new().expect("can't create yolo model");
         let detection = yolo.predict(&image, 0.25, 0.7).postprocess().0;
         println!("detection={:?}", detection);
