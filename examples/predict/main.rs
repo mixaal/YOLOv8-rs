@@ -84,6 +84,11 @@ fn image_segmentation(path: &str) -> Result<(), YoloError> {
 
 // YOLOv8n for object detection in image
 fn main() -> Result<(), YoloError> {
+    println!("{:?}", tch::Device::cuda_if_available());
+
+    println!("CUDA available: {}", tch::Cuda::is_available());
+    println!("CUDA device count: {}", tch::Cuda::device_count());
+
     object_detection("images/bus.jpg")?;
     image_classification("images/bus.jpg")?;
     image_segmentation("images/test.jpg")?;

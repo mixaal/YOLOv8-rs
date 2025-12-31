@@ -1,7 +1,14 @@
-export LIBTORCH=$(pwd)/libtorch/
-export LIBTORCH_INCLUDE=$(pwd)/libtorch/
-export LIBTORCH_LIB=$(pwd)/libtorch/
+#export LIBTORCH=$(pwd)/libtorch/
+#export LIBTORCH_INCLUDE=$(pwd)/libtorch/
+#export LIBTORCH_LIB=$(pwd)/libtorch/
 
-export LD_LIBRARY_PATH="$LIBTORCH/lib/:$LD_LIBRARY_PATH"
+#export LD_LIBRARY_PATH="$LIBTORCH/lib/:$LD_LIBRARY_PATH"
+
+LIBTORCH_USE_PYTORCH=1
+LIBTORCH_BYPASS_VERSION_CHECK=true
+
+
+PYTORCH_PATH=$(python -c "import torch; print(torch.__path__[0])")
+export LD_LIBRARY_PATH=$PYTORCH_PATH/lib:$LD_LIBRARY_PATH
 
 code .
